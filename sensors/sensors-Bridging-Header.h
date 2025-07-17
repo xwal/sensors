@@ -3,16 +3,11 @@
 //
 
 #include <Foundation/Foundation.h>
-#include <CoreFoundation/CoreFoundation.h>
-#include <IOKit/hidsystem/IOHIDEventSystemClient.h>
 
-extern CFDictionaryRef matching(int page, int usage);
-extern IOHIDEventSystemClientRef IOHIDEventSystemClientCreate(CFAllocatorRef allocator);
+extern NSArray<NSString*>* currentSensorNames();
+extern NSArray<NSString*>* voltageSensorNames();
+extern NSArray<NSString*>* thermalSensorNames();
 
-extern NSArray* currentArray();
-extern NSArray* voltageArray();
-extern NSArray* thermalArray();
-
-extern NSArray* returnCurrentValues();
-extern NSArray* returnVoltageValues();
-extern NSArray* returnThermalValues();
+extern NSArray<NSNumber*>* currentSensorValues();
+extern NSArray<NSNumber*>* voltageSensorValues();
+extern NSArray<NSNumber*>* thermalSensorValues();

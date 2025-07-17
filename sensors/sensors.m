@@ -14,41 +14,34 @@ typedef float IOHIDFloat;
 
 IOHIDEventSystemClientRef IOHIDEventSystemClientCreate(CFAllocatorRef allocator);
 int IOHIDEventSystemClientSetMatching(IOHIDEventSystemClientRef client, CFDictionaryRef match);
-int IOHIDEventSystemClientSetMatchingMultiple(IOHIDEventSystemClientRef client, CFArrayRef match);
-IOHIDEventRef IOHIDServiceClientCopyEvent(IOHIDServiceClientRef, int64_t , int32_t, int64_t);
+IOHIDEventRef IOHIDServiceClientCopyEvent(IOHIDServiceClientRef, int64_t, int32_t, int64_t);
 CFStringRef IOHIDServiceClientCopyProperty(IOHIDServiceClientRef service, CFStringRef property);
 IOHIDFloat IOHIDEventGetFloatValue(IOHIDEventRef event, int32_t field);
 
-CFDictionaryRef matching(int page, int usage)
+NSDictionary* matching(int page, int usage)
 {
-    CFNumberRef nums[2];
-    CFStringRef keys[2];
-    
-    keys[0] = CFStringCreateWithCString(0, "PrimaryUsagePage", 0);
-    keys[1] = CFStringCreateWithCString(0, "PrimaryUsage", 0);
-    nums[0] = CFNumberCreate(0, kCFNumberSInt32Type, &page);
-    nums[1] = CFNumberCreate(0, kCFNumberSInt32Type, &usage);
-    
-    CFDictionaryRef dict = CFDictionaryCreate(0, (const void**)keys, (const void**)nums, 2, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    NSDictionary* dict = @ {
+        @"PrimaryUsagePage" : [NSNumber numberWithInt:page],
+        @"PrimaryUsage" : [NSNumber numberWithInt:usage],
+    };
     return dict;
 }
 
-CFArrayRef getProductNames(CFDictionaryRef sensors) {
+NSArray<NSString*>* getProductNames(NSDictionary* sensors)
+{
     IOHIDEventSystemClientRef system = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
-    
-    IOHIDEventSystemClientSetMatching(system, sensors);
-    CFArrayRef matchingsrvs = IOHIDEventSystemClientCopyServices(system);
-    
-    long count = CFArrayGetCount(matchingsrvs);
-    CFMutableArrayRef array = CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
-    
+    IOHIDEventSystemClientSetMatching(system, (__bridge CFDictionaryRef)sensors);
+    NSArray* matchingsrvs = (__bridge NSArray*)IOHIDEventSystemClientCopyServices(system);
+
+    long count = [matchingsrvs count];
+    NSMutableArray* array = [[NSMutableArray alloc] init];
     for (int i = 0; i < count; i++) {
-        IOHIDServiceClientRef sc = (IOHIDServiceClientRef)CFArrayGetValueAtIndex(matchingsrvs, i);
-        CFStringRef name = IOHIDServiceClientCopyProperty(sc, CFSTR("Product"));
+        IOHIDServiceClientRef sc = (__bridge IOHIDServiceClientRef)matchingsrvs[i];
+        NSString* name = (__bridge NSString*)IOHIDServiceClientCopyProperty(sc, (__bridge CFStringRef) @"Product");
         if (name) {
-            CFArrayAppendValue(array, name);
+            [array addObject:name];
         } else {
-            CFArrayAppendValue(array, @"noname");
+            [array addObject:@"noname"];
         }
     }
     return array;
@@ -58,108 +51,119 @@ CFArrayRef getProductNames(CFDictionaryRef sensors) {
 // e.g., https://opensource.apple.com/source/IOHIDFamily/IOHIDFamily-701.60.2/IOHIDFamily/IOHIDEventTypes.h.auto.html
 
 
-#define IOHIDEventFieldBase(type)   (type << 16)
-#define kIOHIDEventTypeTemperature  15
-#define kIOHIDEventTypePower        25
+#define IOHIDEventFieldBase(type) (type << 16)
+#define kIOHIDEventTypeTemperature 15
+#define kIOHIDEventTypePower 25
 
-CFArrayRef getPowerValues(CFDictionaryRef sensors) {
+NSArray<NSNumber*>* getPowerValues(NSDictionary* sensors)
+{
     IOHIDEventSystemClientRef system = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
-    IOHIDEventSystemClientSetMatching(system, sensors);
-    CFArrayRef matchingsrvs = IOHIDEventSystemClientCopyServices(system);
-    
-    long count = CFArrayGetCount(matchingsrvs);
-    CFMutableArrayRef array = CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
+    IOHIDEventSystemClientSetMatching(system, (__bridge CFDictionaryRef)sensors);
+    NSArray* matchingsrvs = (__bridge NSArray*)(IOHIDEventSystemClientCopyServices(system));
+
+    long count = [matchingsrvs count];
+    NSMutableArray* array = [[NSMutableArray alloc] init];
     for (int i = 0; i < count; i++) {
-        IOHIDServiceClientRef sc = (IOHIDServiceClientRef)CFArrayGetValueAtIndex(matchingsrvs, i);
+        IOHIDServiceClientRef sc = (__bridge IOHIDServiceClientRef)matchingsrvs[i];
         IOHIDEventRef event = IOHIDServiceClientCopyEvent(sc, kIOHIDEventTypePower, 0, 0);
-        
-        CFNumberRef value;
-        if (event != 0) {
-            double temp = IOHIDEventGetFloatValue(event, IOHIDEventFieldBase(kIOHIDEventTypePower));
-            value = CFNumberCreate(kCFAllocatorDefault, kCFNumberDoubleType, &temp);
-        } else {
-            double temp = 0;
-            value = CFNumberCreate(kCFAllocatorDefault, kCFNumberDoubleType, &temp);
-        }
-        CFArrayAppendValue(array, value);
-    }
-    return array;
-}
 
-CFArrayRef getThermalValues(CFDictionaryRef sensors) {
-    IOHIDEventSystemClientRef system = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
-    IOHIDEventSystemClientSetMatching(system, sensors);
-    CFArrayRef matchingsrvs = IOHIDEventSystemClientCopyServices(system);
-    
-    long count = CFArrayGetCount(matchingsrvs);
-    CFMutableArrayRef array = CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
-    for (int i = 0; i < count; i++) {
-        IOHIDServiceClientRef sc = (IOHIDServiceClientRef)CFArrayGetValueAtIndex(matchingsrvs, i);
-        IOHIDEventRef event = IOHIDServiceClientCopyEvent(sc, kIOHIDEventTypeTemperature, 0, 0);
-        
-        CFNumberRef value;
-        if (event != 0) {
-            double temp = IOHIDEventGetFloatValue(event, IOHIDEventFieldBase(kIOHIDEventTypeTemperature));
-            value = CFNumberCreate(kCFAllocatorDefault, kCFNumberDoubleType, &temp);
-        } else {
-            double temp = 0;
-            value = CFNumberCreate(kCFAllocatorDefault, kCFNumberDoubleType, &temp);
-        }
-        CFArrayAppendValue(array, value);
-    }
-    return array;
-}
-
-void dumpValues(CFArrayRef values)
-{
-    long count = CFArrayGetCount(values);
-    for (int i = 0; i < count; i++) {
-        CFNumberRef value = CFArrayGetValueAtIndex(values, i);
+        NSNumber* value;
         double temp = 0.0;
-        CFNumberGetValue(value, kCFNumberDoubleType, &temp);
-        // NSLog(@"value = %lf\n", temp);
-        printf(", %lf", temp);
+        if (event != 0) {
+            temp = IOHIDEventGetFloatValue(event, IOHIDEventFieldBase(kIOHIDEventTypePower)) / 1000.0;
+        }
+        value = [NSNumber numberWithDouble:temp];
+        [array addObject:value];
     }
+    return array;
 }
 
-void dumpNames(CFArrayRef names, char *cat)
+NSArray<NSNumber*>* getThermalValues(NSDictionary* sensors)
 {
-    long count = CFArrayGetCount(names);
+    IOHIDEventSystemClientRef system = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
+    IOHIDEventSystemClientSetMatching(system, (__bridge CFDictionaryRef)sensors);
+    NSArray* matchingsrvs = (__bridge NSArray*)IOHIDEventSystemClientCopyServices(system);
+
+    long count = [matchingsrvs count];
+    NSMutableArray* array = [[NSMutableArray alloc] init];
+
     for (int i = 0; i < count; i++) {
-        NSString *name = (NSString *)CFArrayGetValueAtIndex(names, i);
-        // NSLog(@"value = %lf\n", temp);
-        printf(", %s (%s)", [name UTF8String], cat);
+        IOHIDServiceClientRef sc = (__bridge IOHIDServiceClientRef)matchingsrvs[i];
+        IOHIDEventRef event = IOHIDServiceClientCopyEvent(sc, kIOHIDEventTypeTemperature, 0, 0);
+
+        NSNumber* value;
+        double temp = 0.0;
+        if (event != 0) {
+            temp = IOHIDEventGetFloatValue(event, IOHIDEventFieldBase(kIOHIDEventTypeTemperature));
+        }
+        value = [NSNumber numberWithDouble:temp];
+        [array addObject:value];
+    }
+    return array;
+}
+
+void dumpValues(NSArray* kvs)
+{
+    NSUInteger count = [kvs count];
+    for (NSUInteger i = 0; i < count; i++) {
+        if (i > 0)
+            printf(", ");
+        printf("%lf", [[kvs[i] lastObject] doubleValue]);
     }
 }
 
-NSArray* currentArray(void) {
-    CFDictionaryRef currentSensors = matching(0xff08, 2);
-    return CFBridgingRelease(getProductNames(currentSensors));
+void dumpNames(NSArray* kvs, NSString* cat)
+{
+    NSUInteger count = [kvs count];
+    for (NSUInteger i = 0; i < count; i++) {
+        if (i > 0)
+            printf(", ");
+        printf("%s (%s)", [[kvs[i] firstObject] UTF8String], [cat UTF8String]);
+    }
 }
 
-NSArray* voltageArray(void) {
-    CFDictionaryRef currentSensors = matching(0xff08, 3);
-    return CFBridgingRelease(getProductNames(currentSensors));
+NSArray* sortKeyValuePairs(NSArray* keys, NSArray* values)
+{
+
+    NSMutableArray* unsorted_array = [[NSMutableArray alloc] init];
+    for (int i = 0; i < [keys count]; i++) {
+        [unsorted_array addObject:[[NSArray alloc] initWithObjects:keys[i], values[i], nil]];
+    }
+
+    NSArray* sortedArray = [unsorted_array sortedArrayUsingComparator:^(id obj1, id obj2) {
+        return [[obj1 firstObject] compare:[obj2 firstObject]];
+    }];
+    return sortedArray;
 }
 
-NSArray* thermalArray(void) {
-    CFDictionaryRef currentSensors = matching(0xff00, 5);
-    return CFBridgingRelease(getProductNames(currentSensors));
+NSArray<NSString*>* currentSensorNames(void) {
+    NSDictionary* currentSensors = matching(0xff08, 2);
+    return getProductNames(currentSensors);
 }
 
-NSArray* returnCurrentValues(void) {
-    CFDictionaryRef currentSensors = matching(0xff08, 2);
-    return CFBridgingRelease(getPowerValues(currentSensors));
+NSArray<NSString*>* voltageSensorNames(void) {
+    NSDictionary* voltageSensors = matching(0xff08, 3);
+    return getProductNames(voltageSensors);
 }
 
-NSArray* returnVoltageValues(void) {
-    CFDictionaryRef voltageSensors = matching(0xff08, 3);
-    return CFBridgingRelease(getPowerValues(voltageSensors));
+NSArray<NSString*>* thermalSensorNames(void) {
+    NSDictionary* thermalSensors = matching(0xff00, 5);
+    return getProductNames(thermalSensors);
 }
 
-NSArray* returnThermalValues(void) {
-    CFDictionaryRef currentSensors = matching(0xff00, 5);
-    return CFBridgingRelease(getThermalValues(currentSensors));
+NSArray<NSNumber*>* currentSensorValues(void) {
+    NSDictionary* currentSensors = matching(0xff08, 2);
+    return getPowerValues(currentSensors);
+}
+
+NSArray<NSNumber*>* voltageSensorValues(void) {
+    NSDictionary* voltageSensors = matching(0xff08, 3);
+    return getPowerValues(voltageSensors);
+}
+
+NSArray<NSNumber*>* thermalSensorValues(void) {
+    NSDictionary* thermalSensors = matching(0xff00, 5);
+    return getThermalValues(thermalSensors);
 }
 
 

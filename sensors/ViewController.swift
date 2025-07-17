@@ -9,24 +9,42 @@
 import UIKit
 
 class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
-    
     @IBOutlet var tableView: UITableView!
-    
-    var currentNames: [Any] = [], voltageNames: [Any] = [], thermalNames: [Any] = []
-    var currentValues: [Any] = [], voltageValues: [Any] = [], thermalValues: [Any] = []
-    
+
+    var currentNames: [String] = []
+    var voltageNames: [String] = []
+    var thermalNames: [String] = []
+    var currentValues: [NSNumber] = []
+    var voltageValues: [NSNumber] = []
+    var thermalValues: [NSNumber] = []
+
+    var timer: Timer?
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        currentNames = currentArray()
-        voltageNames = voltageArray()
-        thermalNames = thermalArray()
-        
-        currentValues = returnCurrentValues()
-        voltageValues = returnVoltageValues()
-        thermalValues = returnThermalValues()
-      
-        self.tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cell")
+
+        currentNames = currentSensorNames()
+        voltageNames = voltageSensorNames()
+        thermalNames = thermalSensorNames()
+
+        currentValues = currentSensorValues()
+        voltageValues = voltageSensorValues()
+        thermalValues = thermalSensorValues()
+
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cell")
+
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                refreshValues()
+            }
+        }
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        timer?.invalidate()
+        timer = nil
     }
 
     override func didReceiveMemoryWarning() {
@@ -35,7 +53,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        switch (section) {
+        switch section {
         case 0:
             return currentNames.count
         case 1:
@@ -43,61 +61,61 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         case 2:
             return thermalNames.count
         default:
-            return 0;
+            return 0
         }
     }
-    
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell:UITableViewCell = self.tableView.dequeueReusableCell(withIdentifier: "cell")!
-        let string: NSMutableString = ""
-    
-        switch (indexPath.section) {
-        case 0:
-            // cell.textLabel.text =
-            let name = currentNames[indexPath.row] as! NSString
-            let number = currentValues[indexPath.row] as! NSNumber
-            string.appendFormat("%@: %.2lf", name, number.doubleValue)
-        case 1:
-            let name = voltageNames[indexPath.row] as! NSString
-            let number = voltageValues[indexPath.row] as! NSNumber
-            string.appendFormat("%@: %.2lf", name, number.doubleValue)
-        case 2:
-            let name = thermalNames[indexPath.row] as! NSString
-            let number = thermalValues[indexPath.row] as! NSNumber
-            string.appendFormat("%@: %.2lf", name, number.doubleValue)
 
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
+        let text: String
+
+        switch indexPath.section {
+        case 0:
+            let name = currentNames[indexPath.row]
+            let number = currentValues[indexPath.row]
+            text = String(format: "%@: %.2f", name, number.doubleValue)
+        case 1:
+            let name = voltageNames[indexPath.row]
+            let number = voltageValues[indexPath.row]
+            text = String(format: "%@: %.2f", name, number.doubleValue)
+        case 2:
+            let name = thermalNames[indexPath.row]
+            let number = thermalValues[indexPath.row]
+            text = String(format: "%@: %.2f", name, number.doubleValue)
         default:
-            break;
+            text = ""
         }
-        
-        cell.textLabel?.text = string as String?
+
+        cell.textLabel?.text = text
 
         return cell
     }
-    
+
     func numberOfSections(in tableView: UITableView) -> Int {
-        return 3;
+        return 3
     }
 
-    func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        switch (section) {
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        switch section {
         case 0:
-            return "Current (A), \(currentNames.count) items"
+            return "Current (A)"
         case 1:
-            return "Voltage (V), \(voltageNames.count) items"
+            return "Voltage (V)"
         case 2:
-            return "Temperature (°C), \(thermalNames.count) items"
+            return "Temperature (°C)"
         default:
-            return "";
+            return nil
         }
     }
-    
-    @IBAction func reloadData(_ sender : AnyObject) {
-        currentValues = returnCurrentValues()
-        voltageValues = returnVoltageValues()
-        thermalValues = returnThermalValues()
 
+    private func refreshValues() {
+        currentValues = currentSensorValues()
+        voltageValues = voltageSensorValues()
+        thermalValues = thermalSensorValues()
         tableView.reloadData()
     }
-}
 
+    @IBAction func reloadData(_ sender: Any) {
+        refreshValues()
+    }
+}
